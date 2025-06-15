@@ -23,7 +23,7 @@ interface CreateProjectModalProps {
 }
 
 export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: CreateProjectModalProps) {
-  const { userProfile } = useAuth();
+  const { userProfile, user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -37,12 +37,44 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
     color: '#3B82F6'
   });
 
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      description: '',
+      priority: 'medium',
+      status: 'planning',
+      start_date: '',
+      end_date: '',
+      budget: '',
+      color: '#3B82F6'
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!user || !userProfile) {
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to create a project.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!formData.name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Project name is required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const projectData = {
+      console.log('Creating project with data:', {
         name: formData.name,
         description: formData.description,
         priority: formData.priority,
@@ -51,37 +83,53 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
         end_date: formData.end_date || null,
         budget: formData.budget ? parseFloat(formData.budget) : null,
         color: formData.color,
-        owner_id: userProfile?.id,
+        owner_id: userProfile.id,
+        progress: 0
+      });
+
+      const projectData = {
+        name: formData.name.trim(),
+        description: formData.description?.trim() || null,
+        priority: formData.priority,
+        status: formData.status,
+        start_date: formData.start_date || null,
+        end_date: formData.end_date || null,
+        budget: formData.budget ? parseFloat(formData.budget) : null,
+        color: formData.color,
+        owner_id: userProfile.id,
         progress: 0
       };
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('projects')
-        .insert([projectData]);
+        .insert([projectData])
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      console.log('Project created successfully:', data);
 
       toast({
         title: "Success",
-        description: "Project created successfully!",
+        description: `Project "${formData.name}" created successfully!`,
       });
 
-      onProjectCreated();
+      // Reset form and close modal
+      resetForm();
       onOpenChange(false);
-      setFormData({
-        name: '',
-        description: '',
-        priority: 'medium',
-        status: 'planning',
-        start_date: '',
-        end_date: '',
-        budget: '',
-        color: '#3B82F6'
-      });
+      
+      // Trigger refresh of projects list
+      onProjectCreated();
+
     } catch (error: any) {
+      console.error('Error creating project:', error);
       toast({
-        title: "Error",
-        description: error.message,
+        title: "Error Creating Project",
+        description: error.message || "An unexpected error occurred while creating the project.",
         variant: "destructive",
       });
     } finally {
@@ -93,8 +141,15 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleClose = () => {
+    if (!loading) {
+      resetForm();
+      onOpenChange(false);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Create New Project</DialogTitle>
@@ -112,6 +167,7 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
               value={formData.name}
               onChange={(e) => handleInputChange('name', e.target.value)}
               required
+              disabled={loading}
             />
           </div>
 
@@ -123,6 +179,7 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
               value={formData.description}
               onChange={(e) => handleInputChange('description', e.target.value)}
               rows={3}
+              disabled={loading}
             />
           </div>
 
@@ -134,6 +191,7 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
                 value={formData.priority}
                 onChange={(e) => handleInputChange('priority', e.target.value)}
                 className="w-full border border-gray-300 rounded-md px-3 py-2"
+                disabled={loading}
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -149,6 +207,7 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
                 value={formData.status}
                 onChange={(e) => handleInputChange('status', e.target.value)}
                 className="w-full border border-gray-300 rounded-md px-3 py-2"
+                disabled={loading}
               >
                 <option value="planning">Planning</option>
                 <option value="active">Active</option>
@@ -166,6 +225,7 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
                 type="date"
                 value={formData.start_date}
                 onChange={(e) => handleInputChange('start_date', e.target.value)}
+                disabled={loading}
               />
             </div>
 
@@ -176,6 +236,8 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
                 type="date"
                 value={formData.end_date}
                 onChange={(e) => handleInputChange('end_date', e.target.value)}
+                min={formData.start_date}
+                disabled={loading}
               />
             </div>
           </div>
@@ -188,8 +250,10 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
                 type="number"
                 placeholder="0.00"
                 step="0.01"
+                min="0"
                 value={formData.budget}
                 onChange={(e) => handleInputChange('budget', e.target.value)}
+                disabled={loading}
               />
             </div>
 
@@ -201,6 +265,7 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
                 value={formData.color}
                 onChange={(e) => handleInputChange('color', e.target.value)}
                 className="h-10"
+                disabled={loading}
               />
             </div>
           </div>
@@ -209,7 +274,7 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
             <Button 
               type="button" 
               variant="outline" 
-              onClick={() => onOpenChange(false)}
+              onClick={handleClose}
               disabled={loading}
             >
               Cancel

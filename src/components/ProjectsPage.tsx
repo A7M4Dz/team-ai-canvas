@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -13,10 +14,12 @@ import {
   Calendar, 
   Users, 
   Search,
-  Filter
+  Filter,
+  RefreshCw
 } from 'lucide-react';
 import { CreateProjectModal } from './CreateProjectModal';
 import { Link } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
 
 interface Project {
   id: string;
@@ -34,61 +37,90 @@ interface Project {
 }
 
 export function ProjectsPage() {
-  const { userRole, userProfile } = useAuth();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { userRole, userProfile, user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  useEffect(() => {
-    fetchProjects();
-  }, [userRole]);
-
-  const fetchProjects = async () => {
-    try {
-      let query = supabase.from('projects').select('*');
-      
-      if (userRole === 'member') {
-        // Members only see projects they're assigned to
-        const { data: assignments } = await supabase
-          .from('project_members')
-          .select('project_id')
-          .eq('user_id', userProfile?.id);
-        
-        const projectIds = assignments?.map(a => a.project_id) || [];
-        if (projectIds.length > 0) {
-          query = query.in('id', projectIds);
-        } else {
-          setProjects([]);
-          setLoading(false);
-          return;
-        }
-      } else if (userRole === 'manager') {
-        // Managers see their own projects + assigned projects
-        const { data: assignments } = await supabase
-          .from('project_members')
-          .select('project_id')
-          .eq('user_id', userProfile?.id);
-        
-        const assignedIds = assignments?.map(a => a.project_id) || [];
-        
-        if (assignedIds.length > 0) {
-          query = query.or(`owner_id.eq.${userProfile?.id},id.in.(${assignedIds.join(',')})`);
-        } else {
-          query = query.eq('owner_id', userProfile?.id);
-        }
-      }
-      
-      const { data, error } = await query.order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      setProjects(data || []);
-    } catch (error) {
-      console.error('Error fetching projects:', error);
-    } finally {
-      setLoading(false);
+  const fetchProjects = async (): Promise<Project[]> => {
+    if (!userProfile || !user) {
+      throw new Error('User not authenticated');
     }
+
+    console.log('Fetching projects for user:', userProfile.id, 'with role:', userRole);
+
+    let query = supabase.from('projects').select('*');
+    
+    if (userRole === 'member') {
+      // Members only see projects they're assigned to
+      const { data: assignments } = await supabase
+        .from('project_members')
+        .select('project_id')
+        .eq('user_id', userProfile.id);
+      
+      const projectIds = assignments?.map(a => a.project_id) || [];
+      if (projectIds.length > 0) {
+        query = query.in('id', projectIds);
+      } else {
+        return [];
+      }
+    } else if (userRole === 'manager') {
+      // Managers see their own projects + assigned projects
+      const { data: assignments } = await supabase
+        .from('project_members')
+        .select('project_id')
+        .eq('user_id', userProfile.id);
+      
+      const assignedIds = assignments?.map(a => a.project_id) || [];
+      
+      if (assignedIds.length > 0) {
+        query = query.or(`owner_id.eq.${userProfile.id},id.in.(${assignedIds.join(',')})`);
+      } else {
+        query = query.eq('owner_id', userProfile.id);
+      }
+    }
+    // Admin sees all projects (no filter)
+    
+    const { data, error } = await query.order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching projects:', error);
+      throw error;
+    }
+
+    console.log('Fetched projects:', data);
+    return data || [];
+  };
+
+  const { 
+    data: projects = [], 
+    isLoading, 
+    error,
+    refetch 
+  } = useQuery({
+    queryKey: ['projects', userProfile?.id, userRole],
+    queryFn: fetchProjects,
+    enabled: !!userProfile && !!user,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+
+  const handleProjectCreated = () => {
+    console.log('Project created, refetching...');
+    queryClient.invalidateQueries({ queryKey: ['projects'] });
+    toast({
+      title: "Success",
+      description: "Project list updated!",
+    });
+  };
+
+  const handleRefresh = () => {
+    refetch();
+    toast({
+      title: "Refreshing",
+      description: "Updating project list...",
+    });
   };
 
   const getStatusColor = (status: string) => {
@@ -118,7 +150,32 @@ export function ProjectsPage() {
     return matchesSearch && matchesStatus;
   });
 
-  if (loading) {
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Projects</h1>
+          <Button onClick={handleRefresh} variant="outline">
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Retry
+          </Button>
+        </div>
+        <div className="text-center py-12">
+          <div className="text-red-500 mb-4">
+            <FolderOpen className="mx-auto h-12 w-12 mb-2" />
+            <h3 className="text-lg font-medium">Error Loading Projects</h3>
+            <p className="text-sm mt-1">{error.message}</p>
+          </div>
+          <Button onClick={handleRefresh}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
@@ -148,18 +205,28 @@ export function ProjectsPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
           <p className="text-gray-600 mt-1">
-            Manage and track all your projects
+            Manage and track all your projects ({projects.length} total)
           </p>
         </div>
-        {(userRole === 'admin' || userRole === 'manager') && (
+        <div className="flex space-x-2">
           <Button 
-            onClick={() => setShowCreateModal(true)}
-            className="bg-blue-600 hover:bg-blue-700"
+            onClick={handleRefresh} 
+            variant="outline"
+            size="sm"
           >
-            <Plus className="mr-2 h-4 w-4" />
-            New Project
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
           </Button>
-        )}
+          {(userRole === 'admin' || userRole === 'manager') && (
+            <Button 
+              onClick={() => setShowCreateModal(true)}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              New Project
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -276,7 +343,7 @@ export function ProjectsPage() {
       <CreateProjectModal 
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
-        onProjectCreated={fetchProjects}
+        onProjectCreated={handleProjectCreated}
       />
     </div>
   );
