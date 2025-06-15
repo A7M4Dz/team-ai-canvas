@@ -8,8 +8,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error?: string }>;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error?: string }>;
+  signInWithAzure: () => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
   userRole: string | null;
   userProfile: any;
@@ -63,42 +62,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signInWithAzure = async () => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        toast({
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        });
-        return { error: error.message };
-      }
-
-      toast({
-        title: "Success",
-        description: "Signed in successfully!",
-      });
-      return {};
-    } catch (error: any) {
-      return { error: error.message };
-    }
-  };
-
-  const signUp = async (email: string, password: string, fullName: string) => {
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'azure',
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            full_name: fullName,
-          }
+          redirectTo: `${window.location.origin}/`
         }
       });
 
@@ -111,10 +80,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: error.message };
       }
 
-      toast({
-        title: "Success",
-        description: "Account created successfully! Please check your email to verify your account.",
-      });
       return {};
     } catch (error: any) {
       return { error: error.message };
@@ -142,8 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       session,
       loading,
-      signIn,
-      signUp,
+      signInWithAzure,
       signOut,
       userRole,
       userProfile
