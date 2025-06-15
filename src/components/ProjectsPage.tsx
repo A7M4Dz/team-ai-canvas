@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,7 +16,10 @@ import {
   Search,
   Filter,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Shield,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { CreateProjectModal } from './CreateProjectModal';
 import { Link } from 'react-router-dom';
@@ -36,42 +40,44 @@ interface Project {
   created_at: string;
 }
 
-const dummyProjects: Project[] = [
-  { id: 'dummy-1', name: 'Showcase Website Redesign', description: 'Complete overhaul of the company public-facing website to improve user experience and conversion rates.', status: 'active', priority: 'high', progress: 75, start_date: '2025-05-15', end_date: '2025-08-30', budget: 50000, color: '#3B82F6', owner_id: 'dummy-owner', created_at: '2025-05-10T10:00:00Z' },
-  { id: 'dummy-2', name: 'Mobile App Development', description: 'Develop a new cross-platform mobile application for our services. Currently in planning phase.', status: 'planning', priority: 'urgent', progress: 10, start_date: '2025-07-01', end_date: '2025-12-20', budget: 120000, color: '#EF4444', owner_id: 'dummy-owner', created_at: '2025-06-01T12:30:00Z' },
-  { id: 'dummy-3', name: 'Q3 Marketing Campaign', description: 'Project on hold pending budget approval for the next quarter.', status: 'on_hold', priority: 'medium', progress: 40, start_date: '2025-06-10', end_date: '2025-09-30', budget: 35000, color: '#F59E0B', owner_id: 'dummy-owner', created_at: '2025-06-05T09:00:00Z' },
-  { id: 'dummy-4', name: 'API Integration Project', description: 'This project was successfully completed ahead of schedule.', status: 'completed', priority: 'medium', progress: 100, start_date: '2025-03-01', end_date: '2025-05-25', budget: 20000, color: '#10B981', owner_id: 'dummy-owner', created_at: '2025-02-20T14:00:00Z' },
-];
-
 export function ProjectsPage() {
   const { userRole, userProfile, user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
 
   const fetchProjects = async (): Promise<Project[]> => {
     if (!userProfile || !user) {
+      console.log('User not authenticated - missing profile or user');
       throw new Error('User not authenticated');
     }
 
     console.log('Fetching projects for user:', userProfile.id, 'with role:', userRole);
+    console.log('User email:', user.email);
 
-    let query = supabase.from('projects').select('*');
-    
-    // The RLS policies now handle role-based access automatically
-    // No need for manual role filtering in the query
-    
-    const { data, error } = await query.order('created_at', { ascending: false });
-    
-    if (error) {
-      console.error('Error fetching projects:', error);
-      throw new Error(`Failed to fetch projects: ${error.message}`);
+    try {
+      let query = supabase.from('projects').select('*');
+      
+      // The new RLS policies now handle role-based access automatically
+      // No need for manual role filtering in the query
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching projects:', error);
+        throw new Error(`Failed to fetch projects: ${error.message}`);
+      }
+
+      console.log('Successfully fetched projects:', data?.length || 0);
+      return data || [];
+    } catch (err) {
+      console.error('Fetch projects error:', err);
+      throw err;
     }
-
-    console.log('Fetched projects:', data);
-    return data || [];
   };
 
   const { 
@@ -87,6 +93,7 @@ export function ProjectsPage() {
     gcTime: 1000 * 60 * 5, // 5 minutes
     staleTime: 1000 * 60 * 2, // 2 minutes
     retry: (failureCount, error) => {
+      console.log(`Query retry attempt ${failureCount} for error:`, error);
       // Don't retry on authentication or permission errors
       if (error.message.includes('permission') || error.message.includes('authentication')) {
         return false;
@@ -96,22 +103,24 @@ export function ProjectsPage() {
   });
 
   const handleProjectCreated = () => {
-    console.log('Project created, refetching...');
+    console.log('Project created, invalidating queries...');
     queryClient.invalidateQueries({ queryKey: ['projects'] });
     toast({
       title: "Success",
-      description: "Project created and list updated!",
+      description: "Project created successfully!",
     });
   };
 
   const handleRefresh = async () => {
     try {
+      console.log('Manual refresh triggered');
       await refetch();
       toast({
         title: "Refreshed",
         description: "Project list updated successfully!",
       });
     } catch (error) {
+      console.error('Refresh failed:', error);
       toast({
         title: "Refresh Failed",
         description: "Failed to refresh project list. Please try again.",
@@ -140,13 +149,12 @@ export function ProjectsPage() {
     }
   };
 
-  const projectsToDisplay = isError ? dummyProjects : projects;
-
-  const filteredProjects = projectsToDisplay.filter(project => {
+  const filteredProjects = projects.filter(project => {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (project.description || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesPriority = priorityFilter === 'all' || project.priority === priorityFilter;
+    return matchesSearch && matchesStatus && matchesPriority;
   });
 
   const canCreateProjects = userRole === 'admin' || userRole === 'manager';
@@ -181,10 +189,24 @@ export function ProjectsPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
           <p className="text-gray-600 mt-1">
-            Manage and track all your projects ({projectsToDisplay.length} total)
+            Manage and track all your projects ({filteredProjects.length} visible)
           </p>
+          {userRole && (
+            <div className="flex items-center gap-2 mt-2">
+              <Shield className="h-4 w-4 text-blue-500" />
+              <span className="text-sm text-gray-500">Role: {userRole}</span>
+            </div>
+          )}
         </div>
         <div className="flex space-x-2">
+          <Button 
+            onClick={() => setShowDebugInfo(!showDebugInfo)}
+            variant="outline"
+            size="sm"
+          >
+            {showDebugInfo ? <EyeOff className="mr-2 h-4 w-4" /> : <Eye className="mr-2 h-4 w-4" />}
+            Debug
+          </Button>
           <Button 
             onClick={handleRefresh} 
             variant="outline"
@@ -206,6 +228,39 @@ export function ProjectsPage() {
         </div>
       </div>
 
+      {/* Debug Information */}
+      {showDebugInfo && (
+        <div className="bg-gray-100 border rounded-lg p-4">
+          <h3 className="font-semibold mb-2">Debug Information</h3>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <strong>User ID:</strong> {user?.id || 'Not available'}
+            </div>
+            <div>
+              <strong>User Email:</strong> {user?.email || 'Not available'}
+            </div>
+            <div>
+              <strong>User Role:</strong> {userRole || 'Not set'}
+            </div>
+            <div>
+              <strong>Total Projects:</strong> {projects.length}
+            </div>
+            <div>
+              <strong>Query Status:</strong> {isLoading ? 'Loading' : isError ? 'Error' : 'Success'}
+            </div>
+            <div>
+              <strong>Can Create:</strong> {canCreateProjects ? 'Yes' : 'No'}
+            </div>
+          </div>
+          {error && (
+            <div className="mt-2 p-2 bg-red-100 rounded text-red-700 text-sm">
+              <strong>Error:</strong> {error.message}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Error Display */}
       {isError && (
         <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md" role="alert">
           <div className="flex">
@@ -215,14 +270,14 @@ export function ProjectsPage() {
               <p className="text-sm">
                 There was a problem fetching your projects: "{error?.message}".
                 <br />
-                Displaying sample data. Please try refreshing or contact support if the issue persists.
+                Please try refreshing or contact support if the issue persists.
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Filters */}
+      {/* Enhanced Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
@@ -246,15 +301,26 @@ export function ProjectsPage() {
             <option value="on_hold">On Hold</option>
             <option value="completed">Completed</option>
           </select>
+          <select
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-2 bg-white"
+          >
+            <option value="all">All Priority</option>
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
         </div>
       </div>
 
       {/* Projects Grid */}
-      {filteredProjects.length > 0 ? (
+      {!isError && filteredProjects.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => (
-            <Link key={project.id} to={isError ? '#' : `/projects/${project.id}`}>
-              <Card className={`hover:shadow-lg transition-shadow h-full ${isError ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+            <Link key={project.id} to={`/projects/${project.id}`}>
+              <Card className="hover:shadow-lg transition-shadow h-full cursor-pointer border-l-4" style={{ borderLeftColor: project.color || '#3B82F6' }}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-2">
@@ -301,7 +367,7 @@ export function ProjectsPage() {
                     <Badge variant="outline" className="text-xs capitalize">
                       {project.status.replace('_', ' ')}
                     </Badge>
-                    <Button variant="ghost" size="sm" disabled={isError}>
+                    <Button variant="ghost" size="sm">
                       <FolderOpen className="h-4 w-4" />
                     </Button>
                   </div>
@@ -310,17 +376,17 @@ export function ProjectsPage() {
             </Link>
           ))}
         </div>
-      ) : (
+      ) : !isError && (
         <div className="text-center py-12">
           <FolderOpen className="mx-auto h-12 w-12 text-gray-400 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No projects found</h3>
           <p className="text-gray-500 mb-4">
-            {searchTerm || statusFilter !== 'all' 
+            {searchTerm || statusFilter !== 'all' || priorityFilter !== 'all'
               ? 'Try adjusting your search or filters'
               : 'Get started by creating your first project'
             }
           </p>
-          {canCreateProjects && !searchTerm && statusFilter === 'all' && (
+          {canCreateProjects && !searchTerm && statusFilter === 'all' && priorityFilter === 'all' && (
             <Button 
               onClick={() => setShowCreateModal(true)}
               className="bg-blue-600 hover:bg-blue-700"
