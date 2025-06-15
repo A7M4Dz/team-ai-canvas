@@ -73,7 +73,7 @@ export function TasksPage() {
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
-  const hasFilters = searchTerm || statusFilter !== 'all' || priorityFilter !== 'all';
+  const hasFilters = Boolean(searchTerm) || statusFilter !== 'all' || priorityFilter !== 'all';
 
   if (authLoading || tasksLoading) {
     return <TaskLoadingState authLoading={authLoading} />;
