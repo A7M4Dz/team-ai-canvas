@@ -48,12 +48,12 @@ export function ProjectsPage() {
     console.log('User email:', user.email);
 
     try {
-      let query = supabase.from('projects').select('*');
-      
       // The new RLS policies now handle role-based access automatically
       // No need for manual role filtering in the query
-      
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false });
       
       if (error) {
         console.error('Error fetching projects:', error);
