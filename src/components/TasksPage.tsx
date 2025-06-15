@@ -35,38 +35,39 @@ interface GanttTask extends Task {
 }
 
 export function TasksPage() {
-  const { userProfile, user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
   const fetchTasks = async (): Promise<Task[]> => {
-    if (!userProfile || !user) {
-      throw new Error('User not authenticated');
-    }
-
+    console.log('Fetching tasks, user:', user?.email);
+    
     const { data, error } = await supabase
       .from('tasks')
       .select('*')
       .order('start_date', { ascending: true });
     
     if (error) {
+      console.error('Error fetching tasks:', error);
       throw new Error(`Failed to fetch tasks: ${error.message}`);
     }
 
+    console.log('Tasks fetched successfully:', data?.length || 0);
     return data || [];
   };
 
   const { 
     data: tasks = [], 
-    isLoading, 
+    isLoading: tasksLoading, 
     error,
     refetch,
     isError
   } = useQuery({
-    queryKey: ['tasks', userProfile?.id],
+    queryKey: ['tasks'],
     queryFn: fetchTasks,
-    enabled: !!userProfile && !!user,
+    enabled: !authLoading, // Only run when auth is not loading
+    retry: 1,
   });
 
   const filteredTasks = tasks.filter(task => {
@@ -139,17 +140,21 @@ export function TasksPage() {
     return null;
   };
 
-  if (isLoading) {
+  // Show loading state while auth is loading or tasks are loading
+  if (authLoading || tasksLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading tasks...</p>
+          <p className="text-gray-600">
+            {authLoading ? 'Authenticating...' : 'Loading tasks...'}
+          </p>
         </div>
       </div>
     );
   }
 
+  // Show error state
   if (isError) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
