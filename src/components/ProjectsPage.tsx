@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,6 +35,13 @@ interface Project {
   owner_id: string;
   created_at: string;
 }
+
+const dummyProjects: Project[] = [
+  { id: 'dummy-1', name: 'Showcase Website Redesign', description: 'Complete overhaul of the company public-facing website to improve user experience and conversion rates.', status: 'active', priority: 'high', progress: 75, start_date: '2025-05-15', end_date: '2025-08-30', budget: 50000, color: '#3B82F6', owner_id: 'dummy-owner', created_at: '2025-05-10T10:00:00Z' },
+  { id: 'dummy-2', name: 'Mobile App Development', description: 'Develop a new cross-platform mobile application for our services. Currently in planning phase.', status: 'planning', priority: 'urgent', progress: 10, start_date: '2025-07-01', end_date: '2025-12-20', budget: 120000, color: '#EF4444', owner_id: 'dummy-owner', created_at: '2025-06-01T12:30:00Z' },
+  { id: 'dummy-3', name: 'Q3 Marketing Campaign', description: 'Project on hold pending budget approval for the next quarter.', status: 'on_hold', priority: 'medium', progress: 40, start_date: '2025-06-10', end_date: '2025-09-30', budget: 35000, color: '#F59E0B', owner_id: 'dummy-owner', created_at: '2025-06-05T09:00:00Z' },
+  { id: 'dummy-4', name: 'API Integration Project', description: 'This project was successfully completed ahead of schedule.', status: 'completed', priority: 'medium', progress: 100, start_date: '2025-03-01', end_date: '2025-05-25', budget: 20000, color: '#10B981', owner_id: 'dummy-owner', created_at: '2025-02-20T14:00:00Z' },
+];
 
 export function ProjectsPage() {
   const { userRole, userProfile, user } = useAuth();
@@ -134,54 +140,18 @@ export function ProjectsPage() {
     }
   };
 
-  const filteredProjects = projects.filter(project => {
+  const projectsToDisplay = isError ? dummyProjects : projects;
+
+  const filteredProjects = projectsToDisplay.filter(project => {
     const matchesSearch = project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         project.description?.toLowerCase().includes(searchTerm.toLowerCase());
+                         (project.description || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
   const canCreateProjects = userRole === 'admin' || userRole === 'manager';
 
-  if (isError || error) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Projects</h1>
-          <Button onClick={handleRefresh} variant="outline">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Retry
-          </Button>
-        </div>
-        <div className="text-center py-12">
-          <div className="text-red-500 mb-4">
-            <AlertCircle className="mx-auto h-12 w-12 mb-2" />
-            <h3 className="text-lg font-medium">Error Loading Projects</h3>
-            <p className="text-sm mt-1 max-w-md mx-auto">
-              {error?.message || 'An unexpected error occurred while loading projects.'}
-            </p>
-          </div>
-          <div className="space-x-2">
-            <Button onClick={handleRefresh}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Try Again
-            </Button>
-            {canCreateProjects && (
-              <Button 
-                onClick={() => setShowCreateModal(true)}
-                variant="outline"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Create Project
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoading) {
+  if (isLoading && !isError) {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
@@ -211,7 +181,7 @@ export function ProjectsPage() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Projects</h1>
           <p className="text-gray-600 mt-1">
-            Manage and track all your projects ({projects.length} total)
+            Manage and track all your projects ({projectsToDisplay.length} total)
           </p>
         </div>
         <div className="flex space-x-2">
@@ -219,8 +189,9 @@ export function ProjectsPage() {
             onClick={handleRefresh} 
             variant="outline"
             size="sm"
+            disabled={isLoading}
           >
-            <RefreshCw className="mr-2 h-4 w-4" />
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
           {canCreateProjects && (
@@ -234,6 +205,22 @@ export function ProjectsPage() {
           )}
         </div>
       </div>
+
+      {isError && (
+        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md" role="alert">
+          <div className="flex">
+            <div className="py-1"><AlertCircle className="h-6 w-6 text-red-500 mr-4" /></div>
+            <div>
+              <p className="font-bold">Error Loading Projects</p>
+              <p className="text-sm">
+                There was a problem fetching your projects: "{error?.message}".
+                <br />
+                Displaying sample data. Please try refreshing or contact support if the issue persists.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -266,8 +253,8 @@ export function ProjectsPage() {
       {filteredProjects.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => (
-            <Link key={project.id} to={`/projects/${project.id}`}>
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+            <Link key={project.id} to={isError ? '#' : `/projects/${project.id}`}>
+              <Card className={`hover:shadow-lg transition-shadow h-full ${isError ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-2">
@@ -304,17 +291,17 @@ export function ProjectsPage() {
                     </div>
                   </div>
 
-                  {project.budget && (
+                  {project.budget > 0 && (
                     <div className="text-sm text-gray-600">
                       Budget: ${project.budget.toLocaleString()}
                     </div>
                   )}
 
                   <div className="flex justify-between items-center pt-2 border-t">
-                    <Badge variant="outline" className="text-xs">
+                    <Badge variant="outline" className="text-xs capitalize">
                       {project.status.replace('_', ' ')}
                     </Badge>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" disabled={isError}>
                       <FolderOpen className="h-4 w-4" />
                     </Button>
                   </div>
