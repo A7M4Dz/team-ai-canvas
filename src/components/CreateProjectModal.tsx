@@ -15,6 +15,13 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface CreateProjectModalProps {
   open: boolean;
@@ -50,6 +57,39 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
     });
   };
 
+  const validateForm = () => {
+    if (!formData.name.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Project name is required.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (formData.start_date && formData.end_date) {
+      if (new Date(formData.start_date) > new Date(formData.end_date)) {
+        toast({
+          title: "Validation Error",
+          description: "End date must be after start date.",
+          variant: "destructive",
+        });
+        return false;
+      }
+    }
+
+    if (formData.budget && isNaN(parseFloat(formData.budget))) {
+      toast({
+        title: "Validation Error",
+        description: "Budget must be a valid number.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    return true;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -62,12 +102,7 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
       return;
     }
 
-    if (!formData.name.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Project name is required.",
-        variant: "destructive",
-      });
+    if (!validateForm()) {
       return;
     }
 
@@ -127,9 +162,20 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
 
     } catch (error: any) {
       console.error('Error creating project:', error);
+      
+      let errorMessage = "An unexpected error occurred while creating the project.";
+      
+      if (error.message?.includes('permission denied')) {
+        errorMessage = "You don't have permission to create projects. Please contact your administrator.";
+      } else if (error.message?.includes('violates row-level security')) {
+        errorMessage = "Security policy violation. Please ensure you have the correct permissions.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error Creating Project",
-        description: error.message || "An unexpected error occurred while creating the project.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -150,7 +196,7 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Project</DialogTitle>
           <DialogDescription>
@@ -168,6 +214,7 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
               onChange={(e) => handleInputChange('name', e.target.value)}
               required
               disabled={loading}
+              maxLength={100}
             />
           </div>
 
@@ -180,40 +227,47 @@ export function CreateProjectModal({ open, onOpenChange, onProjectCreated }: Cre
               onChange={(e) => handleInputChange('description', e.target.value)}
               rows={3}
               disabled={loading}
+              maxLength={500}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="priority">Priority</Label>
-              <select
-                id="priority"
+              <Select
                 value={formData.priority}
-                onChange={(e) => handleInputChange('priority', e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                onValueChange={(value) => handleInputChange('priority', value)}
                 disabled={loading}
               >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
-              <select
-                id="status"
+              <Select
                 value={formData.status}
-                onChange={(e) => handleInputChange('status', e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2"
+                onValueChange={(value) => handleInputChange('status', value)}
                 disabled={loading}
               >
-                <option value="planning">Planning</option>
-                <option value="active">Active</option>
-                <option value="on_hold">On Hold</option>
-                <option value="completed">Completed</option>
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="planning">Planning</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="on_hold">On Hold</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

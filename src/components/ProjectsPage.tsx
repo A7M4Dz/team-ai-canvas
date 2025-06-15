@@ -15,7 +15,8 @@ import {
   Users, 
   Search,
   Filter,
-  RefreshCw
+  RefreshCw,
+  AlertCircle
 } from 'lucide-react';
 import { CreateProjectModal } from './CreateProjectModal';
 import { Link } from 'react-router-dom';
@@ -53,41 +54,14 @@ export function ProjectsPage() {
 
     let query = supabase.from('projects').select('*');
     
-    if (userRole === 'member') {
-      // Members only see projects they're assigned to
-      const { data: assignments } = await supabase
-        .from('project_members')
-        .select('project_id')
-        .eq('user_id', userProfile.id);
-      
-      const projectIds = assignments?.map(a => a.project_id) || [];
-      if (projectIds.length > 0) {
-        query = query.in('id', projectIds);
-      } else {
-        return [];
-      }
-    } else if (userRole === 'manager') {
-      // Managers see their own projects + assigned projects
-      const { data: assignments } = await supabase
-        .from('project_members')
-        .select('project_id')
-        .eq('user_id', userProfile.id);
-      
-      const assignedIds = assignments?.map(a => a.project_id) || [];
-      
-      if (assignedIds.length > 0) {
-        query = query.or(`owner_id.eq.${userProfile.id},id.in.(${assignedIds.join(',')})`);
-      } else {
-        query = query.eq('owner_id', userProfile.id);
-      }
-    }
-    // Admin sees all projects (no filter)
+    // The RLS policies now handle role-based access automatically
+    // No need for manual role filtering in the query
     
     const { data, error } = await query.order('created_at', { ascending: false });
     
     if (error) {
       console.error('Error fetching projects:', error);
-      throw error;
+      throw new Error(`Failed to fetch projects: ${error.message}`);
     }
 
     console.log('Fetched projects:', data);
@@ -98,12 +72,21 @@ export function ProjectsPage() {
     data: projects = [], 
     isLoading, 
     error,
-    refetch 
+    refetch,
+    isError
   } = useQuery({
     queryKey: ['projects', userProfile?.id, userRole],
     queryFn: fetchProjects,
     enabled: !!userProfile && !!user,
+    gcTime: 1000 * 60 * 5, // 5 minutes
     staleTime: 1000 * 60 * 2, // 2 minutes
+    retry: (failureCount, error) => {
+      // Don't retry on authentication or permission errors
+      if (error.message.includes('permission') || error.message.includes('authentication')) {
+        return false;
+      }
+      return failureCount < 3;
+    },
   });
 
   const handleProjectCreated = () => {
@@ -111,16 +94,24 @@ export function ProjectsPage() {
     queryClient.invalidateQueries({ queryKey: ['projects'] });
     toast({
       title: "Success",
-      description: "Project list updated!",
+      description: "Project created and list updated!",
     });
   };
 
-  const handleRefresh = () => {
-    refetch();
-    toast({
-      title: "Refreshing",
-      description: "Updating project list...",
-    });
+  const handleRefresh = async () => {
+    try {
+      await refetch();
+      toast({
+        title: "Refreshed",
+        description: "Project list updated successfully!",
+      });
+    } catch (error) {
+      toast({
+        title: "Refresh Failed",
+        description: "Failed to refresh project list. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -150,7 +141,9 @@ export function ProjectsPage() {
     return matchesSearch && matchesStatus;
   });
 
-  if (error) {
+  const canCreateProjects = userRole === 'admin' || userRole === 'manager';
+
+  if (isError || error) {
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
@@ -162,14 +155,27 @@ export function ProjectsPage() {
         </div>
         <div className="text-center py-12">
           <div className="text-red-500 mb-4">
-            <FolderOpen className="mx-auto h-12 w-12 mb-2" />
+            <AlertCircle className="mx-auto h-12 w-12 mb-2" />
             <h3 className="text-lg font-medium">Error Loading Projects</h3>
-            <p className="text-sm mt-1">{error.message}</p>
+            <p className="text-sm mt-1 max-w-md mx-auto">
+              {error?.message || 'An unexpected error occurred while loading projects.'}
+            </p>
           </div>
-          <Button onClick={handleRefresh}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Try Again
-          </Button>
+          <div className="space-x-2">
+            <Button onClick={handleRefresh}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Try Again
+            </Button>
+            {canCreateProjects && (
+              <Button 
+                onClick={() => setShowCreateModal(true)}
+                variant="outline"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Create Project
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -217,7 +223,7 @@ export function ProjectsPage() {
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
-          {(userRole === 'admin' || userRole === 'manager') && (
+          {canCreateProjects && (
             <Button 
               onClick={() => setShowCreateModal(true)}
               className="bg-blue-600 hover:bg-blue-700"
@@ -261,14 +267,14 @@ export function ProjectsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => (
             <Link key={project.id} to={`/projects/${project.id}`}>
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-2">
                       <div 
                         className={`w-3 h-3 rounded-full ${getStatusColor(project.status)}`}
                       />
-                      <CardTitle className="text-lg">{project.name}</CardTitle>
+                      <CardTitle className="text-lg line-clamp-1">{project.name}</CardTitle>
                     </div>
                     <Badge variant={getPriorityColor(project.priority)} className="text-xs">
                       {project.priority}
@@ -327,7 +333,7 @@ export function ProjectsPage() {
               : 'Get started by creating your first project'
             }
           </p>
-          {(userRole === 'admin' || userRole === 'manager') && !searchTerm && statusFilter === 'all' && (
+          {canCreateProjects && !searchTerm && statusFilter === 'all' && (
             <Button 
               onClick={() => setShowCreateModal(true)}
               className="bg-blue-600 hover:bg-blue-700"
