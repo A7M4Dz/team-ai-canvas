@@ -54,10 +54,10 @@ export function TeamPage() {
       if (error) throw error;
       
       // Map the data to include default values for missing fields
-      const mappedMembers = (data || []).map(member => ({
+      const mappedMembers = (data || []).map((member: any) => ({
         ...member,
-        workload: member.workload || 0,
-        status: member.status || 'active'
+        workload: (member as any).workload || 0,
+        status: (member as any).status || 'active'
       }));
       
       setTeamMembers(mappedMembers);
@@ -234,7 +234,7 @@ export function TeamPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Active</p>
-                <p className="text-2xl font-bold">{teamMembers.filter(m => m.status === 'active').length}</p>
+                <p className="text-2xl font-bold">{teamMembers.filter(m => (m.status || 'active') === 'active').length}</p>
               </div>
               <div className="w-3 h-3 bg-green-500 rounded-full"></div>
             </div>
@@ -261,7 +261,7 @@ export function TeamPage() {
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <div className={`w-3 h-3 rounded-full ${getStatusColor(member.status)}`} />
+                  <div className={`w-3 h-3 rounded-full ${getStatusColor(member.status || 'active')}`} />
                   {userRole === 'admin' && (
                     <Button variant="ghost" size="sm">
                       <MoreHorizontal className="h-4 w-4" />

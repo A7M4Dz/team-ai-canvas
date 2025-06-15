@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -99,7 +98,7 @@ export function ProjectDetailPage() {
         .order('created_at', { ascending: false });
 
       // Map tasks to include default values for missing fields
-      const mappedTasks = (tasksData || []).map(task => ({
+      const mappedTasks = (tasksData || []).map((task: any) => ({
         ...task,
         assignee_id: task.assignee_id || null
       }));

@@ -60,10 +60,10 @@ export function SettingsPage() {
       if (error) throw error;
       
       // Map the data to include default values for missing fields
-      const mappedProfiles = (data || []).map(profile => ({
+      const mappedProfiles = (data || []).map((profile: any) => ({
         ...profile,
-        workload: profile.workload || 0,
-        status: profile.status || 'active'
+        workload: (profile as any).workload || 0,
+        status: (profile as any).status || 'active'
       }));
       
       setProfiles(mappedProfiles);
@@ -360,7 +360,7 @@ export function SettingsPage() {
                           <div>
                             <div className="flex items-center space-x-2">
                               <h4 className="font-medium">{profile.full_name || 'User'}</h4>
-                              <div className={`w-2 h-2 rounded-full ${getStatusColor(profile.status)}`} />
+                              <div className={`w-2 h-2 rounded-full ${getStatusColor(profile.status || 'active')}`} />
                             </div>
                             <p className="text-sm text-gray-600">{profile.email}</p>
                             <div className="flex items-center space-x-2 mt-1">
