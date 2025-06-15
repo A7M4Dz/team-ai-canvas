@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -304,7 +303,7 @@ export function TeamPage() {
                       <CardTitle className="text-lg flex items-center space-x-2">
                         <span>{member.full_name || 'User'}</span>
                         {member.email === 'ahmualotaibi@flynas.com' && (
-                          <Shield className="h-4 w-4 text-red-600" title="Super Admin" />
+                          <Shield className="h-4 w-4 text-red-600" aria-label="Super Admin" />
                         )}
                       </CardTitle>
                       <CardDescription>{member.email}</CardDescription>
