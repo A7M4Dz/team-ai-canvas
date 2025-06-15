@@ -49,7 +49,7 @@ interface Task {
   start_date: string;
   end_date: string;
   assignee: string;
-  assignee_id: string;
+  assignee_id?: string;
   estimated_hours: number;
   actual_hours: number;
 }
@@ -98,7 +98,13 @@ export function ProjectDetailPage() {
         .eq('project_id', id)
         .order('created_at', { ascending: false });
 
-      setTasks(tasksData || []);
+      // Map tasks to include default values for missing fields
+      const mappedTasks = (tasksData || []).map(task => ({
+        ...task,
+        assignee_id: task.assignee_id || null
+      }));
+      
+      setTasks(mappedTasks);
 
       // Fetch team members
       const { data: membersData } = await supabase

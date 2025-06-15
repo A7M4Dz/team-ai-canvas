@@ -31,8 +31,8 @@ interface UserProfile {
   department: string;
   position: string;
   avatar_url: string;
-  workload: number;
-  status: string;
+  workload?: number;
+  status?: string;
 }
 
 export function SettingsPage() {
@@ -58,7 +58,15 @@ export function SettingsPage() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setProfiles(data || []);
+      
+      // Map the data to include default values for missing fields
+      const mappedProfiles = (data || []).map(profile => ({
+        ...profile,
+        workload: profile.workload || 0,
+        status: profile.status || 'active'
+      }));
+      
+      setProfiles(mappedProfiles);
     } catch (error) {
       console.error('Error fetching profiles:', error);
       toast({

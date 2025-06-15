@@ -27,8 +27,8 @@ interface TeamMember {
   department: string;
   position: string;
   avatar_url: string;
-  workload: number;
-  status: string;
+  workload?: number;
+  status?: string;
   created_at: string;
 }
 
@@ -52,7 +52,15 @@ export function TeamPage() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTeamMembers(data || []);
+      
+      // Map the data to include default values for missing fields
+      const mappedMembers = (data || []).map(member => ({
+        ...member,
+        workload: member.workload || 0,
+        status: member.status || 'active'
+      }));
+      
+      setTeamMembers(mappedMembers);
     } catch (error) {
       console.error('Error fetching team members:', error);
       toast({
