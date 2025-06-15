@@ -16,6 +16,7 @@ import {
   Calendar,
   BarChart3
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 interface DashboardStats {
   totalProjects: number;
@@ -51,23 +52,32 @@ export function Dashboard() {
       
       if (userRole === 'member') {
         // Members only see projects they're assigned to
-        projectsQuery = projectsQuery.in('id', 
-          await supabase
-            .from('project_members')
-            .select('project_id')
-            .eq('user_id', userProfile?.id)
-            .then(res => res.data?.map(p => p.project_id) || [])
-        );
-      } else if (userRole === 'manager') {
-        // Managers see their own projects + assigned projects
-        const assignedProjects = await supabase
+        const { data: assignments } = await supabase
           .from('project_members')
           .select('project_id')
           .eq('user_id', userProfile?.id);
         
-        const assignedIds = assignedProjects.data?.map(p => p.project_id) || [];
+        const projectIds = assignments?.map(a => a.project_id) || [];
+        if (projectIds.length > 0) {
+          projectsQuery = projectsQuery.in('id', projectIds);
+        } else {
+          // If no assignments, set empty array and continue
+          setRecentProjects([]);
+        }
+      } else if (userRole === 'manager') {
+        // Managers see their own projects + assigned projects
+        const { data: assignments } = await supabase
+          .from('project_members')
+          .select('project_id')
+          .eq('user_id', userProfile?.id);
         
-        projectsQuery = projectsQuery.or(`owner_id.eq.${userProfile?.id},id.in.(${assignedIds.join(',')})`);
+        const assignedIds = assignments?.map(a => a.project_id) || [];
+        
+        if (assignedIds.length > 0) {
+          projectsQuery = projectsQuery.or(`owner_id.eq.${userProfile?.id},id.in.(${assignedIds.join(',')})`);
+        } else {
+          projectsQuery = projectsQuery.eq('owner_id', userProfile?.id);
+        }
       }
       
       const { data: projects } = await projectsQuery;
@@ -160,10 +170,12 @@ export function Dashboard() {
           </p>
         </div>
         {(userRole === 'admin' || userRole === 'manager') && (
-          <Button className="bg-blue-600 hover:bg-blue-700">
-            <Plus className="mr-2 h-4 w-4" />
-            New Project
-          </Button>
+          <Link to="/projects">
+            <Button className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="mr-2 h-4 w-4" />
+              New Project
+            </Button>
+          </Link>
         )}
       </div>
 
@@ -234,25 +246,27 @@ export function Dashboard() {
           </CardHeader>
           <CardContent className="space-y-4">
             {recentProjects.length > 0 ? recentProjects.map((project) => (
-              <div key={project.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2">
-                    <div 
-                      className={`w-3 h-3 rounded-full ${getStatusColor(project.status)}`}
-                    />
-                    <h4 className="font-medium text-sm">{project.name}</h4>
+              <Link key={project.id} to={`/projects/${project.id}`}>
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      <div 
+                        className={`w-3 h-3 rounded-full ${getStatusColor(project.status)}`}
+                      />
+                      <h4 className="font-medium text-sm">{project.name}</h4>
+                    </div>
+                    <div className="flex items-center space-x-4 mt-1">
+                      <Badge variant={getPriorityColor(project.priority)} className="text-xs">
+                        {project.priority}
+                      </Badge>
+                      <span className="text-xs text-gray-500">
+                        {project.progress}% complete
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-4 mt-1">
-                    <Badge variant={getPriorityColor(project.priority)} className="text-xs">
-                      {project.priority}
-                    </Badge>
-                    <span className="text-xs text-gray-500">
-                      {project.progress}% complete
-                    </span>
-                  </div>
+                  <Progress value={project.progress} className="w-20" />
                 </div>
-                <Progress value={project.progress} className="w-20" />
-              </div>
+              </Link>
             )) : (
               <p className="text-gray-500 text-center py-4">No recent projects</p>
             )}

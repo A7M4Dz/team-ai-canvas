@@ -9,6 +9,10 @@ import { AuthPage } from "@/components/AuthPage";
 import { Layout } from "@/components/Layout";
 import { Dashboard } from "@/components/Dashboard";
 import { ProjectsPage } from "@/components/ProjectsPage";
+import { TeamPage } from "@/components/TeamPage";
+import { AnalyticsPage } from "@/components/AnalyticsPage";
+import { ProjectDetailPage } from "@/components/ProjectDetailPage";
+import { SettingsPage } from "@/components/SettingsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -37,6 +41,31 @@ function AppRoutes() {
       <Route path="/" element={
         <ProtectedRoute>
           <Dashboard />
+        </ProtectedRoute>
+      } />
+      <Route path="/projects" element={
+        <ProtectedRoute>
+          <ProjectsPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/projects/:id" element={
+        <ProtectedRoute>
+          <ProjectDetailPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/team" element={
+        <ProtectedRoute>
+          <TeamPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/analytics" element={
+        <ProtectedRoute>
+          <AnalyticsPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/settings" element={
+        <ProtectedRoute>
+          <SettingsPage />
         </ProtectedRoute>
       } />
       <Route path="*" element={<NotFound />} />

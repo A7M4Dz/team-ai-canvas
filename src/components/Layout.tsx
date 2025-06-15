@@ -9,7 +9,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Settings, Home, FolderOpen, BarChart3 } from 'lucide-react';
+import { LogOut, User, Settings, Home, FolderOpen, BarChart3, Users } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 
 interface LayoutProps {
@@ -23,6 +23,7 @@ export function Layout({ children }: LayoutProps) {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Projects', href: '/projects', icon: FolderOpen },
+    { name: 'Team', href: '/team', icon: Users },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   ];
 
@@ -82,13 +83,17 @@ export function Layout({ children }: LayoutProps) {
                     <div className="text-sm text-gray-500">{user?.email}</div>
                     <div className="text-xs text-blue-600 capitalize">{userProfile?.role}</div>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
+                  <DropdownMenuItem asChild>
+                    <Link to="/settings" className="flex items-center">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
+                  <DropdownMenuItem asChild>
+                    <Link to="/settings" className="flex items-center">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Settings</span>
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={signOut}>
                     <LogOut className="mr-2 h-4 w-4" />

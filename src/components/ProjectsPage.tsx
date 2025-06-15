@@ -16,6 +16,7 @@ import {
   Filter
 } from 'lucide-react';
 import { CreateProjectModal } from './CreateProjectModal';
+import { Link } from 'react-router-dom';
 
 interface Project {
   id: string;
@@ -192,59 +193,61 @@ export function ProjectsPage() {
       {filteredProjects.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => (
-            <Card key={project.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-2">
-                    <div 
-                      className={`w-3 h-3 rounded-full ${getStatusColor(project.status)}`}
-                    />
-                    <CardTitle className="text-lg">{project.name}</CardTitle>
+            <Link key={project.id} to={`/projects/${project.id}`}>
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div 
+                        className={`w-3 h-3 rounded-full ${getStatusColor(project.status)}`}
+                      />
+                      <CardTitle className="text-lg">{project.name}</CardTitle>
+                    </div>
+                    <Badge variant={getPriorityColor(project.priority)} className="text-xs">
+                      {project.priority}
+                    </Badge>
                   </div>
-                  <Badge variant={getPriorityColor(project.priority)} className="text-xs">
-                    {project.priority}
-                  </Badge>
-                </div>
-                <CardDescription className="line-clamp-2">
-                  {project.description || 'No description available'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm text-gray-600 mb-1">
-                    <span>Progress</span>
-                    <span>{project.progress}%</span>
+                  <CardDescription className="line-clamp-2">
+                    {project.description || 'No description available'}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-sm text-gray-600 mb-1">
+                      <span>Progress</span>
+                      <span>{project.progress}%</span>
+                    </div>
+                    <Progress value={project.progress} className="h-2" />
                   </div>
-                  <Progress value={project.progress} className="h-2" />
-                </div>
-                
-                <div className="flex justify-between text-sm text-gray-500">
-                  <div className="flex items-center">
-                    <Calendar className="h-3 w-3 mr-1" />
-                    {project.start_date ? new Date(project.start_date).toLocaleDateString() : 'No date'}
+                  
+                  <div className="flex justify-between text-sm text-gray-500">
+                    <div className="flex items-center">
+                      <Calendar className="h-3 w-3 mr-1" />
+                      {project.start_date ? new Date(project.start_date).toLocaleDateString() : 'No date'}
+                    </div>
+                    <div className="flex items-center">
+                      <Users className="h-3 w-3 mr-1" />
+                      Team
+                    </div>
                   </div>
-                  <div className="flex items-center">
-                    <Users className="h-3 w-3 mr-1" />
-                    Team
-                  </div>
-                </div>
 
-                {project.budget && (
-                  <div className="text-sm text-gray-600">
-                    Budget: ${project.budget.toLocaleString()}
-                  </div>
-                )}
+                  {project.budget && (
+                    <div className="text-sm text-gray-600">
+                      Budget: ${project.budget.toLocaleString()}
+                    </div>
+                  )}
 
-                <div className="flex justify-between items-center pt-2 border-t">
-                  <Badge variant="outline" className="text-xs">
-                    {project.status.replace('_', ' ')}
-                  </Badge>
-                  <Button variant="ghost" size="sm">
-                    <FolderOpen className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+                  <div className="flex justify-between items-center pt-2 border-t">
+                    <Badge variant="outline" className="text-xs">
+                      {project.status.replace('_', ' ')}
+                    </Badge>
+                    <Button variant="ghost" size="sm">
+                      <FolderOpen className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       ) : (
