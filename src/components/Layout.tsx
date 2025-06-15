@@ -9,7 +9,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Settings, Home, FolderOpen, BarChart3, Users } from 'lucide-react';
+import { LogOut, User, Settings, Home, CheckSquare, BarChart3, Users } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 
 interface LayoutProps {
@@ -22,7 +22,7 @@ export function Layout({ children }: LayoutProps) {
 
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Home },
-    { name: 'Projects', href: '/projects', icon: FolderOpen },
+    { name: 'Tasks', href: '/tasks', icon: CheckSquare },
     { name: 'Team', href: '/team', icon: Users },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   ];

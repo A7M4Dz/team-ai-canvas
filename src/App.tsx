@@ -8,10 +8,9 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { AuthPage } from "@/components/AuthPage";
 import { Layout } from "@/components/Layout";
 import { Dashboard } from "@/components/Dashboard";
-import { ProjectsPage } from "@/components/ProjectsPage";
+import { TasksPage } from "@/components/TasksPage";
 import { TeamPage } from "@/components/TeamPage";
 import { AnalyticsPage } from "@/components/AnalyticsPage";
-import { ProjectDetailPage } from "@/components/ProjectDetailPage";
 import { SettingsPage } from "@/components/SettingsPage";
 import NotFound from "./pages/NotFound";
 
@@ -60,14 +59,9 @@ function AppRoutes() {
           <Dashboard />
         </ProtectedRoute>
       } />
-      <Route path="/projects" element={
+      <Route path="/tasks" element={
         <ProtectedRoute>
-          <ProjectsPage />
-        </ProtectedRoute>
-      } />
-      <Route path="/projects/:id" element={
-        <ProtectedRoute>
-          <ProjectDetailPage />
+          <TasksPage />
         </ProtectedRoute>
       } />
       <Route path="/team" element={
