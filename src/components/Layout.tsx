@@ -9,7 +9,8 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Settings } from 'lucide-react';
+import { LogOut, User, Settings, Home, FolderOpen, BarChart3 } from 'lucide-react';
+import { useLocation, Link } from 'react-router-dom';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -17,6 +18,20 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const { user, signOut, userProfile } = useAuth();
+  const location = useLocation();
+
+  const navigation = [
+    { name: 'Dashboard', href: '/', icon: Home },
+    { name: 'Projects', href: '/projects', icon: FolderOpen },
+    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+  ];
+
+  const isActive = (href: string) => {
+    if (href === '/') {
+      return location.pathname === '/';
+    }
+    return location.pathname.startsWith(href);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -24,8 +39,29 @@ export function Layout({ children }: LayoutProps) {
       <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
+            <div className="flex items-center space-x-8">
               <h1 className="text-2xl font-bold text-blue-600">ProjectAI</h1>
+              
+              {/* Navigation */}
+              <nav className="hidden md:flex space-x-1">
+                {navigation.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        isActive(item.href)
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                      }`}
+                    >
+                      <Icon className="mr-2 h-4 w-4" />
+                      {item.name}
+                    </Link>
+                  );
+                })}
+              </nav>
             </div>
             
             <div className="flex items-center space-x-4">
@@ -61,6 +97,29 @@ export function Layout({ children }: LayoutProps) {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+          </div>
+        </div>
+
+        {/* Mobile Navigation */}
+        <div className="md:hidden border-t border-gray-200">
+          <div className="px-4 py-2 space-y-1">
+            {navigation.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive(item.href)
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  <Icon className="mr-2 h-4 w-4" />
+                  {item.name}
+                </Link>
+              );
+            })}
           </div>
         </div>
       </header>

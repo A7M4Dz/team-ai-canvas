@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { AuthPage } from "@/components/AuthPage";
 import { Layout } from "@/components/Layout";
 import { Dashboard } from "@/components/Dashboard";
+import { ProjectsPage } from "@/components/ProjectsPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
