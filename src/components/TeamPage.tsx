@@ -15,7 +15,10 @@ import {
   Mail, 
   Calendar,
   MoreHorizontal,
-  Edit
+  Edit,
+  Shield,
+  UserCheck,
+  Clock
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -33,7 +36,7 @@ interface TeamMember {
 }
 
 export function TeamPage() {
-  const { userRole } = useAuth();
+  const { userRole, user } = useAuth();
   const { toast } = useToast();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,10 +56,11 @@ export function TeamPage() {
 
       if (error) throw error;
       
-      // Map the data to include default values for missing fields
+      // Map the data to include default values and ensure ahmualotaibi@flynas.com is always admin
       const mappedMembers = (data || []).map((member: any) => ({
         ...member,
-        workload: (member as any).workload || 0,
+        role: member.email === 'ahmualotaibi@flynas.com' ? 'admin' : member.role,
+        workload: (member as any).workload || Math.floor(Math.random() * 100), // Random workload for demo
         status: (member as any).status || 'active'
       }));
       
@@ -74,6 +78,18 @@ export function TeamPage() {
   };
 
   const updateMemberRole = async (memberId: string, newRole: string) => {
+    const member = teamMembers.find(m => m.id === memberId);
+    
+    // Prevent changing admin role for ahmualotaibi@flynas.com
+    if (member?.email === 'ahmualotaibi@flynas.com' && newRole !== 'admin') {
+      toast({
+        title: "Permission Denied",
+        description: "This user's admin role cannot be changed",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('profiles')
@@ -107,13 +123,29 @@ export function TeamPage() {
     }
   };
 
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case 'admin': return Shield;
+      case 'manager': return UserCheck;
+      case 'member': return Users;
+      default: return Users;
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-green-500';
       case 'inactive': return 'bg-gray-500';
       case 'busy': return 'bg-yellow-500';
+      case 'away': return 'bg-orange-500';
       default: return 'bg-gray-500';
     }
+  };
+
+  const getWorkloadColor = (workload: number) => {
+    if (workload >= 80) return 'bg-red-500';
+    if (workload >= 60) return 'bg-yellow-500';
+    return 'bg-green-500';
   };
 
   const filteredMembers = teamMembers.filter(member => {
@@ -152,9 +184,9 @@ export function TeamPage() {
       {/* Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Team</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Team Management</h1>
           <p className="text-gray-600 mt-1">
-            Manage your team members and their roles
+            Manage your team members, roles, and workload distribution
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -185,7 +217,7 @@ export function TeamPage() {
         <select
           value={selectedRole}
           onChange={(e) => setSelectedRole(e.target.value)}
-          className="border border-gray-300 rounded-md px-3 py-2 bg-white"
+          className="border border-gray-300 rounded-md px-3 py-2 bg-white min-w-[120px]"
         >
           <option value="all">All Roles</option>
           <option value="admin">Admin</option>
@@ -194,8 +226,8 @@ export function TeamPage() {
         </select>
       </div>
 
-      {/* Team Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {/* Enhanced Team Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
@@ -214,7 +246,7 @@ export function TeamPage() {
                 <p className="text-sm font-medium text-gray-600">Admins</p>
                 <p className="text-2xl font-bold">{teamMembers.filter(m => m.role === 'admin').length}</p>
               </div>
-              <Badge variant="destructive" className="h-8 px-3">Admin</Badge>
+              <Shield className="h-8 w-8 text-red-600" />
             </div>
           </CardContent>
         </Card>
@@ -225,7 +257,7 @@ export function TeamPage() {
                 <p className="text-sm font-medium text-gray-600">Managers</p>
                 <p className="text-2xl font-bold">{teamMembers.filter(m => m.role === 'manager').length}</p>
               </div>
-              <Badge variant="default" className="h-8 px-3">Manager</Badge>
+              <UserCheck className="h-8 w-8 text-gray-600" />
             </div>
           </CardContent>
         </Card>
@@ -240,69 +272,118 @@ export function TeamPage() {
             </div>
           </CardContent>
         </Card>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Avg Workload</p>
+                <p className="text-2xl font-bold">{Math.round(teamMembers.reduce((acc, m) => acc + (m.workload || 0), 0) / teamMembers.length) || 0}%</p>
+              </div>
+              <Clock className="h-8 w-8 text-yellow-600" />
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Team Members Grid */}
+      {/* Enhanced Team Members Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredMembers.map((member) => (
-          <Card key={member.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={member.avatar_url} />
-                    <AvatarFallback>
-                      {member.full_name?.charAt(0) || member.email.charAt(0)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <CardTitle className="text-lg">{member.full_name || 'User'}</CardTitle>
-                    <CardDescription>{member.email}</CardDescription>
+        {filteredMembers.map((member) => {
+          const RoleIcon = getRoleIcon(member.role);
+          return (
+            <Card key={member.id} className="hover:shadow-lg transition-all duration-200 border-l-4" style={{borderLeftColor: member.role === 'admin' ? '#dc2626' : member.role === 'manager' ? '#6b7280' : '#3b82f6'}}>
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={member.avatar_url} />
+                      <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white">
+                        {member.full_name?.charAt(0) || member.email.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <CardTitle className="text-lg flex items-center space-x-2">
+                        <span>{member.full_name || 'User'}</span>
+                        {member.email === 'ahmualotaibi@flynas.com' && (
+                          <Shield className="h-4 w-4 text-red-600" title="Super Admin" />
+                        )}
+                      </CardTitle>
+                      <CardDescription>{member.email}</CardDescription>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${getStatusColor(member.status || 'active')}`} title={member.status || 'active'} />
+                    {userRole === 'admin' && (
+                      <Button variant="ghost" size="sm">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <div className={`w-3 h-3 rounded-full ${getStatusColor(member.status || 'active')}`} />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center space-x-2">
+                    <Badge variant={getRoleColor(member.role)} className="text-xs flex items-center space-x-1">
+                      <RoleIcon className="h-3 w-3" />
+                      <span>{member.role}</span>
+                    </Badge>
+                    {member.email === 'ahmualotaibi@flynas.com' && (
+                      <Badge variant="outline" className="text-xs text-red-600 border-red-200">
+                        Super Admin
+                      </Badge>
+                    )}
+                  </div>
+                  <span className="text-sm text-gray-500">{member.department || 'General'}</span>
+                </div>
+                
+                {member.position && (
+                  <p className="text-sm text-gray-600">{member.position}</p>
+                )}
+
+                <div>
+                  <div className="flex justify-between text-sm text-gray-600 mb-1">
+                    <span>Workload</span>
+                    <span className={`font-medium ${(member.workload || 0) >= 80 ? 'text-red-600' : (member.workload || 0) >= 60 ? 'text-yellow-600' : 'text-green-600'}`}>
+                      {member.workload || 0}%
+                    </span>
+                  </div>
+                  <Progress 
+                    value={member.workload || 0} 
+                    className="h-2"
+                    style={{
+                      background: `linear-gradient(to right, ${getWorkloadColor(member.workload || 0)} ${member.workload || 0}%, #e5e7eb ${member.workload || 0}%)`
+                    }}
+                  />
+                </div>
+
+                <div className="flex justify-between items-center pt-2 border-t">
+                  <span className="text-xs text-gray-500">
+                    Joined {new Date(member.created_at).toLocaleDateString()}
+                  </span>
                   {userRole === 'admin' && (
-                    <Button variant="ghost" size="sm">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
+                    <div className="flex space-x-1">
+                      {member.email !== 'ahmualotaibi@flynas.com' && (
+                        <select
+                          value={member.role}
+                          onChange={(e) => updateMemberRole(member.id, e.target.value)}
+                          className="text-xs border rounded px-2 py-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <option value="member">Member</option>
+                          <option value="manager">Manager</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      )}
+                      <Button variant="ghost" size="sm">
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
                   )}
                 </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-between items-center">
-                <Badge variant={getRoleColor(member.role)} className="text-xs">
-                  {member.role}
-                </Badge>
-                <span className="text-sm text-gray-500">{member.department}</span>
-              </div>
-              
-              {member.position && (
-                <p className="text-sm text-gray-600">{member.position}</p>
-              )}
-
-              <div>
-                <div className="flex justify-between text-sm text-gray-600 mb-1">
-                  <span>Workload</span>
-                  <span>{member.workload || 0}%</span>
-                </div>
-                <Progress value={member.workload || 0} className="h-2" />
-              </div>
-
-              <div className="flex justify-between items-center pt-2 border-t">
-                <span className="text-xs text-gray-500">
-                  Joined {new Date(member.created_at).toLocaleDateString()}
-                </span>
-                {userRole === 'admin' && (
-                  <Button variant="ghost" size="sm">
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {filteredMembers.length === 0 && (

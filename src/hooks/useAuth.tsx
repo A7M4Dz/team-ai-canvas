@@ -25,45 +25,91 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Set up auth state listener
+    console.log('Setting up auth state listener...');
+    
+    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch user profile and role
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-          
-          if (profile) {
-            setUserRole(profile.role);
-            setUserProfile(profile);
-          }
+          // Use setTimeout to avoid blocking the auth state change
+          setTimeout(async () => {
+            try {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single();
+              
+              if (profile) {
+                // Always set ahmualotaibi@flynas.com as admin
+                const finalRole = session.user.email === 'ahmualotaibi@flynas.com' ? 'admin' : (profile.role || 'member');
+                
+                // Update role in database if needed
+                if (session.user.email === 'ahmualotaibi@flynas.com' && profile.role !== 'admin') {
+                  await supabase
+                    .from('profiles')
+                    .update({ role: 'admin' })
+                    .eq('id', session.user.id);
+                }
+                
+                setUserRole(finalRole);
+                setUserProfile({ ...profile, role: finalRole });
+              } else {
+                // Create profile if it doesn't exist
+                const newRole = session.user.email === 'ahmualotaibi@flynas.com' ? 'admin' : 'member';
+                const { data: newProfile } = await supabase
+                  .from('profiles')
+                  .insert({
+                    id: session.user.id,
+                    email: session.user.email!,
+                    full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
+                    role: newRole
+                  })
+                  .select()
+                  .single();
+                
+                if (newProfile) {
+                  setUserRole(newRole);
+                  setUserProfile(newProfile);
+                }
+              }
+            } catch (error) {
+              console.error('Error fetching/creating profile:', error);
+              setUserRole('member');
+            }
+          }, 0);
         } else {
           setUserRole(null);
           setUserProfile(null);
         }
         
+        // Always set loading to false after processing
         setLoading(false);
       }
     );
 
-    // Get initial session
+    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (!session) setLoading(false);
+      console.log('Initial session check:', session?.user?.email);
+      if (!session) {
+        setLoading(false);
+      }
+      // Don't set session here as it will be handled by the listener
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('Cleaning up auth subscription');
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signInWithAzure = async () => {
     try {
+      setLoading(true);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'azure',
         options: {
@@ -77,16 +123,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           description: error.message,
           variant: "destructive",
         });
+        setLoading(false);
         return { error: error.message };
       }
 
       return {};
     } catch (error: any) {
+      setLoading(false);
       return { error: error.message };
     }
   };
 
   const signOut = async () => {
+    setLoading(true);
     const { error } = await supabase.auth.signOut();
     if (error) {
       toast({
@@ -100,6 +149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "Signed out successfully!",
       });
     }
+    setLoading(false);
   };
 
   return (
